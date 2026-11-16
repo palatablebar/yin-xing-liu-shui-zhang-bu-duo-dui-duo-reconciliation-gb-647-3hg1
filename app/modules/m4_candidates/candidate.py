@@ -1,6 +1,7 @@
 """候选生成：一对一、一对多（账簿子集和）、多对一（银行子集和）。
 
-- 金额差 ≤ 容差、日期差 ≤ 窗口、方向相同；
+- 只在同一币种内配对：人民币金额碰巧相等不足以成为候选；
+- 金额差 ≤ 容差、日期差 ≤ 窗口、方向相同，全部按原币判断；
 - 子集最多 4 条，按金额降序枚举，超过目标 + 容差的分支不再递归；
 - 手续费不参与匹配金额，只随银行行进入成本统计。
 """
@@ -25,6 +26,7 @@ def as_row(record: dict) -> dict:
         "direction": int(record["direction"]),
         "amount": dec(record["amount"]),
         "fee": dec(record["fee"]),
+        "currency": record.get("currency") or "CNY",
     }
 
 
@@ -73,12 +75,14 @@ def _candidate(tier: int, banks: list[dict], ledgers: list[dict], zone) -> dict:
         gap = _day_gap(banks[0]["posted_at"], ledgers, zone)
     else:
         gap = _day_gap(ledgers[0]["posted_at"], banks, zone)
+    currency = banks[0]["currency"]
     key = hashlib.sha1(
-        f"{tier}|{','.join(bank_ids)}|{','.join(ledger_ids)}".encode("utf-8")
+        f"{tier}|{currency}|{','.join(bank_ids)}|{','.join(ledger_ids)}".encode("utf-8")
     ).hexdigest()[:10]
     return {
         "cand_id": f"c{tier}-{key}",
         "tier": tier,
+        "currency": currency,
         "bank_ids": bank_ids,
         "ledger_ids": ledger_ids,
         "bank_sum": bank_sum,
@@ -100,6 +104,8 @@ def build(records: list[dict], settings) -> list[dict]:
         for ledger_row in ledger:
             if bank_row["direction"] != ledger_row["direction"]:
                 continue
+            if bank_row["currency"] != ledger_row["currency"]:
+                continue
             gap = window.day_gap(bank_row["posted_at"], ledger_row["posted_at"], zone)
             if gap > settings.window_days:
                 continue
@@ -110,6 +116,7 @@ def build(records: list[dict], settings) -> list[dict]:
         pool = [
             row for row in ledger
             if row["direction"] == bank_row["direction"]
+            and row["currency"] == bank_row["currency"]
             and window.day_gap(bank_row["posted_at"], row["posted_at"], zone) <= settings.window_days
         ]
         for combo in bounded_subsets(pool, bank_row["amount"], tolerance, max_items):
@@ -119,6 +126,7 @@ def build(records: list[dict], settings) -> list[dict]:
         pool = [
             row for row in bank
             if row["direction"] == ledger_row["direction"]
+            and row["currency"] == ledger_row["currency"]
             and window.day_gap(ledger_row["posted_at"], row["posted_at"], zone) <= settings.window_days
         ]
         for combo in bounded_subsets(pool, ledger_row["amount"], tolerance, max_items):
@@ -127,6 +135,7 @@ def build(records: list[dict], settings) -> list[dict]:
     results.sort(
         key=lambda item: (
             item["tier"],
+            item["currency"],
             item["diff"],
             item["day_gap"],
             ",".join(item["bank_ids"]),

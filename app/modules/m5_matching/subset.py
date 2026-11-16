@@ -12,6 +12,7 @@ TIER_NAMES = {1: "一对一", 2: "一对多", 3: "多对一"}
 def priority_key(candidate: dict) -> tuple:
     return (
         int(candidate["tier"]),
+        str(candidate.get("currency", "CNY")),
         abs(Decimal(str(candidate["diff"]))),
         int(candidate["day_gap"]),
         ",".join(candidate["bank_ids"]),

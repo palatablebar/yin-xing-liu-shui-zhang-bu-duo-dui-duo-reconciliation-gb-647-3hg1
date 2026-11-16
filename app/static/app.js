@@ -12,7 +12,12 @@ function flash(message, kind) {
 
 async function post(url, body) {
   const options = { method: "POST" };
-  if (body) options.body = body;
+  if (body instanceof FormData) {
+    options.body = body;
+  } else if (body !== undefined) {
+    options.headers = { "Content-Type": "application/json" };
+    options.body = JSON.stringify(body);
+  }
   const response = await fetch(url, options);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -28,10 +33,32 @@ function setBusy(value) {
   });
 }
 
-async function runAction(name) {
+async function runAction(name, payload) {
   if (state.busy) return;
   if (name === "quarantine") {
     window.location.href = "/quarantine";
+    return;
+  }
+  if (name === "switch-result") {
+    setBusy(true);
+    try {
+      await post("/api/rates", { result_id: payload.resultId });
+      window.location.reload();
+    } catch (error) {
+      flash(error.message);
+    } finally {
+      setBusy(false);
+    }
+    return;
+  }
+  if (name === "rates-reset") {
+    const form = document.querySelector("#rates-form");
+    if (!form) return;
+    form.querySelectorAll("input[data-currency]").forEach((input) => {
+      if (input.dataset.currency in state.defaultRates) {
+        input.value = state.defaultRates[input.dataset.currency];
+      }
+    });
     return;
   }
   const urls = {
@@ -55,8 +82,32 @@ async function runAction(name) {
 document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("click", (event) => {
     const button = event.target.closest("[data-action]");
-    if (button) runAction(button.dataset.action);
+    if (button) {
+      runAction(button.dataset.action, { resultId: button.dataset.resultId });
+    }
   });
+
+  const ratesForm = document.querySelector("#rates-form");
+  if (ratesForm) {
+    const defaults = {};
+    ratesForm.querySelectorAll("input[data-currency]").forEach((input) => {
+      defaults[input.dataset.currency] = input.defaultValue;
+    });
+    state.defaultRates = defaults;
+    ratesForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const rates = {};
+      ratesForm.querySelectorAll("input[data-currency]").forEach((input) => {
+        rates[input.dataset.currency] = input.value.trim();
+      });
+      try {
+        await post("/api/rates", { rates });
+        window.location.reload();
+      } catch (error) {
+        flash(error.message);
+      }
+    });
+  }
 
   const form = document.querySelector("#import-form");
   if (form) {

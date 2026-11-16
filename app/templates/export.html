@@ -5,6 +5,7 @@
   <header class="page-head">
     <h1>导出</h1>
     <span class="page-meta">{{ summary.run_id or '无批次' }}</span>
+    <span class="page-meta">结果 {{ summary.result_version or '-' }}</span>
   </header>
   <section class="panel">
     <h2>文件</h2>
@@ -13,6 +14,8 @@
       <a class="btn" href="/api/export/manifest.json">运行清单</a>
       <a class="btn" href="/api/quarantine.csv">隔离 CSV</a>
     </div>
+    <p class="hint">下载只读当前生效结果 {{ summary.result_id or '-' }}，与页面同一批匹配与折算；
+      汇率 {% for code, rate in summary.rates.items() %}{{ code }}={{ rate }} {% endfor %}。</p>
   </section>
   <section class="panel">
     <h2>合计</h2>

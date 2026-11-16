@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
@@ -12,8 +11,8 @@ from . import reasons
 from .config import BASE_DIR
 from .modules.m2_contract import service as contract_service
 from .modules.m5_matching.subset import TIER_NAMES
-from .modules.m6_diff import differences as differences_mod
 from .modules.m6_diff import history as history_mod
+from .modules.m6_diff import service as diff_service
 from .modules.m7_export import service as export_service
 
 TEMPLATE_DIR = BASE_DIR / "templates"
@@ -97,6 +96,8 @@ TOTAL_LABELS = {
     "ledger_matched": "账簿匹配",
     "ledger_unmatched": "账簿未匹配",
     "match_gap": "匹配差额",
+    "native_match_gap_base": "其中原币差额折算",
+    "fx_diff_total": "其中折算尾差",
     "fee_alloc_total": "手续费分摊",
     "fee_actual_total": "手续费实际",
 }
@@ -147,9 +148,7 @@ def setup(app: FastAPI) -> None:
         for group in matches:
             for key in group["bank_ids"] + group["ledger_ids"]:
                 pairs[key] = group["match_id"]
-        reconciliation = (
-            differences_mod.reconcile(records, matches, settings) if run else None
-        )
+        reconciliation = diff_service.payload(store, run, settings) if run else None
         context.update({
             "bank_rows": bank_rows,
             "ledger_rows": ledger_rows,
@@ -190,14 +189,25 @@ def setup(app: FastAPI) -> None:
     @app.get("/matches")
     def matches(request: Request):
         store = request.app.state.store
+        settings = request.app.state.settings
         context = base(request, "匹配", "/matches")
         run = context["run"]
+        result = store.active_result(run["run_id"]) if run else None
         groups = store.matches(run["run_id"]) if run else []
         fee_total = sum((Decimal(group["fee_alloc"]) for group in groups), Decimal("0.00"))
+        rates = (result["rates"] if result else
+                 {code: format(value, "f")
+                  for code, value in sorted(settings.default_rates.items())})
         context.update({
             "groups": groups,
             "tier_names": TIER_NAMES,
             "fee_total": fee_total,
+            "result_id": result["result_id"] if result else None,
+            "result_version": result["version"] if result else None,
+            "rates": rates,
+            "base_currency": settings.base_currency,
+            "default_rates": {code: format(value, "f")
+                              for code, value in sorted(settings.default_rates.items())},
         })
         return render(request, "matches.html", context)
 
@@ -210,15 +220,17 @@ def setup(app: FastAPI) -> None:
         batches_list = history_mod.batches(store, 12)
         reconciliation = None
         manifest = None
+        results: list[dict] = []
         if run:
-            records = store.records(run["run_id"])
-            matches = store.matches(run["run_id"])
-            reconciliation = differences_mod.reconcile(records, matches, settings)
-            manifest = history_mod.manifest(store, run, reconciliation["totals"])
+            reconciliation = diff_service.payload(store, run, settings)
+            result = store.active_result(run["run_id"])
+            manifest = history_mod.manifest(store, run, reconciliation["totals"], result)
+            results = store.results(run["run_id"])
         context.update({
             "batches": batches_list,
             "reconciliation": reconciliation,
             "manifest": manifest,
+            "results": results,
         })
         return render(request, "batches.html", context)
 

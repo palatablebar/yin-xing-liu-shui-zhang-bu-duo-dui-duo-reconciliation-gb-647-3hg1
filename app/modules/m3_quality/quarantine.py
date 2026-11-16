@@ -6,7 +6,8 @@ import io
 
 from ... import reasons
 
-CSV_HEADER = ["序号", "侧", "行号", "业务号", "账户", "金额原值", "时间原值", "原因码", "原因", "原行"]
+CSV_HEADER = ["序号", "侧", "行号", "业务号", "账户", "币种", "金额原值", "时间原值",
+              "原因码", "原因", "原行"]
 
 
 def rows(records: list[dict]) -> list[dict]:
@@ -29,6 +30,7 @@ def csv_text(records: list[dict]) -> str:
                 record["row_no"],
                 record["txn_no"],
                 record["account"],
+                record.get("currency", ""),
                 record.get("raw_amount", ""),
                 record.get("raw_date", ""),
                 record["reason"],

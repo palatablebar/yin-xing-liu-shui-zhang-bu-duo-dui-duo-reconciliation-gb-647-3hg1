@@ -32,6 +32,27 @@ ACCOUNTS = {
     "6222-0056": "货款户",
 }
 
+# 关账本位币。原币用于核对，人民币用于关账，两者不混用。
+BASE_CURRENCY = "CNY"
+
+# 币种别名：输入列里既可能写 ISO 代码，也可能写中文名或符号。
+CURRENCY_ALIASES = {
+    "cny": "CNY", "rmb": "CNY", "人民币": "CNY", "元": "CNY", "￥": "CNY", "¥": "CNY",
+    "usd": "USD", "美元": "USD", "美金": "USD", "us$": "USD", "$": "USD",
+    "hkd": "HKD", "港币": "HKD", "港元": "HKD", "hk$": "HKD", "hkd$": "HKD",
+}
+
+# 默认汇率（1 单位原币折合人民币），可在运行时按批次调整并留版本。
+# 汇率不进入 run_id：同一批原始文件换汇率重跑仍属同一批次，结果按 result set 版本化。
+DEFAULT_RATES = {
+    "CNY": Decimal("1.000000"),
+    "USD": Decimal("7.200000"),
+    "HKD": Decimal("0.920000"),
+}
+
+# 汇率保留 6 位小数；人民币金额折算后量化到分。
+RATE_QUANTUM = Decimal("0.000001")
+
 
 def dec(value) -> Decimal:
     """把存储里的字符串金额转回 Decimal；已是 Decimal 时原样返回。"""
@@ -53,6 +74,8 @@ class Settings:
     encodings: tuple = ENCODING_CHAIN
     sentinels: tuple = SENTINELS
     accounts: dict = field(default_factory=lambda: dict(ACCOUNTS))
+    base_currency: str = BASE_CURRENCY
+    default_rates: dict = field(default_factory=lambda: dict(DEFAULT_RATES))
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -64,10 +87,15 @@ class Settings:
         )
 
     def params(self) -> dict:
+        # 汇率故意不进入 params：params 参与 run_id，换汇率应留在同一批次内按版本重跑。
         return {
             "tolerance": str(self.tolerance),
             "window_days": self.window_days,
             "subset_max": self.subset_max,
             "fee_quantum": str(self.fee_quantum),
             "timezone": self.tz_name,
+            "base_currency": self.base_currency,
         }
+
+    def default_rate(self, currency: str) -> Decimal:
+        return self.default_rates.get(currency, Decimal("1.000000"))

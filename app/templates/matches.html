@@ -5,22 +5,55 @@
   <header class="page-head">
     <h1>匹配</h1>
     <span class="page-meta">{{ groups|length }} 组</span>
-    <span class="page-meta">手续费 {{ fee_total|money }} 元</span>
+    <span class="page-meta">结果 {{ result_version or '-' }} · {{ result_id or '-' }}</span>
+    <span class="page-meta">手续费(人民币) {{ fee_total|money }} 元</span>
     <a class="btn" href="/batches">看批次</a>
   </header>
+
   <section class="panel">
+    <h2>折算汇率（{{ base_currency }} 关账）</h2>
+    <form id="rates-form" class="import-form">
+      {% for code, rate in rates.items() %}
+      <label class="rate-field">
+        <span class="chip">{{ code }}</span>
+        <input type="text" inputmode="decimal" name="rate-{{ code }}"
+               data-currency="{{ code }}" value="{{ rate }}"
+               {% if code == base_currency %}readonly{% endif %} aria-label="{{ code }} 汇率">
+      </label>
+      {% endfor %}
+      <button class="btn" type="submit">按新汇率重跑</button>
+      <button class="btn" type="button" data-action="rates-reset">恢复默认</button>
+    </form>
+    <p class="hint">调整汇率生成新的结果版本，旧版本完整保留；重跑失败时旧版仍生效。</p>
+  </section>
+
+  <section class="panel">
+    <h2>匹配组</h2>
     <div class="table-wrap">
       <table class="grid" id="match-table">
-        <thead><tr><th>层级</th><th>银行流水</th><th>账簿凭证</th><th class="num">银行金额</th><th class="num">账簿金额</th><th class="num">差额</th><th class="num">手续费分摊</th></tr></thead>
+        <thead><tr>
+          <th>层级</th><th>币种</th><th class="num">汇率</th>
+          <th>银行流水</th><th>账簿凭证</th>
+          <th class="num">银行原币</th><th class="num">账簿原币</th><th class="num">原币差额</th>
+          <th class="num">银行人民币</th><th class="num">账簿人民币</th>
+          <th class="num">人民币差额</th><th class="num">折算差异</th>
+          <th class="num">手续费(人民币)</th>
+        </tr></thead>
         <tbody>
         {% for group in groups %}
           <tr>
             <td>{{ group.tier|tier_label }}</td>
+            <td class="mono">{{ group.currency }}</td>
+            <td class="num mono">{{ group.rate }}</td>
             <td class="mono">{{ group.bank_ids|join(' ') }}</td>
             <td class="mono">{{ group.ledger_ids|join(' ') }}</td>
             <td class="num mono">{{ group.bank_sum|money }}</td>
             <td class="num mono">{{ group.ledger_sum|money }}</td>
             <td class="num mono">{{ group.diff|money }}</td>
+            <td class="num mono">{{ group.bank_sum_base|money }}</td>
+            <td class="num mono">{{ group.ledger_sum_base|money }}</td>
+            <td class="num mono">{{ group.diff_base|money }}</td>
+            <td class="num mono">{{ group.fx_diff|money }}</td>
             <td class="num mono">{{ group.fee_alloc|money }}</td>
           </tr>
         {% endfor %}

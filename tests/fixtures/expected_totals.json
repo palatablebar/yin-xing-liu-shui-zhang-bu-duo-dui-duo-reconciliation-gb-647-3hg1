@@ -10,7 +10,9 @@
     "ledger_unmatched": "-10002238.14",
     "match_gap": "0.01",
     "fee_alloc_total": "22.31",
-    "fee_actual_total": "22.31"
+    "fee_actual_total": "22.31",
+    "native_match_gap_base": "0.01",
+    "fx_diff_total": "0.00"
   },
   "counts": {
     "bank_valid": 22,

@@ -9,6 +9,7 @@ from decimal import Decimal
 from ... import reasons
 from ..m1_ingest.decode import normalize_cell
 from ..m2_contract.coerce import parse_amount, parse_date, parse_direction, parse_fee
+from ..m2_contract.currency import resolve_currency
 
 
 def evaluate_row(side: str, row: dict, settings) -> dict:
@@ -51,6 +52,12 @@ def evaluate_row(side: str, row: dict, settings) -> dict:
     if account and account not in settings.accounts:
         codes.append("ACCOUNT_UNKNOWN")
 
+    currency, currency_source = resolve_currency(
+        cells.get("currency", ""), cells.get("amount", ""), settings.base_currency
+    )
+    if currency is None:
+        codes.append("CURRENCY_UNKNOWN")
+
     primary = reasons.primary(codes)
     record = {
         "side": side,
@@ -61,12 +68,15 @@ def evaluate_row(side: str, row: dict, settings) -> dict:
         "direction": direction or 0,
         "amount": amount if amount is not None else Decimal("0.00"),
         "fee": fee,
+        "currency": currency or settings.base_currency,
+        "currency_source": currency_source,
         "memo": normalize_cell(cells.get("memo", "")),
         "counterparty": normalize_cell(cells.get("counterparty", "")),
         "status": "quarantine" if codes else "valid",
         "reason": primary or "",
         "flags": codes,
         "raw_amount": cells.get("amount", ""),
+        "raw_currency": cells.get("currency", ""),
         "raw_date": cells.get("posted_at", ""),
         "raw": row.get("raw", []),
     }

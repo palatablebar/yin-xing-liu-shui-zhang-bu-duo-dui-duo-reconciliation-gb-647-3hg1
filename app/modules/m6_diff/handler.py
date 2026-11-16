@@ -22,3 +22,18 @@ def get_batches(request: Request):
 @router.get("/api/batches/{run_id}")
 def get_batch(request: Request, run_id: str):
     return service.batch_detail(request.app.state.store, run_id, request.app.state.settings)
+
+
+@router.get("/api/batches/{run_id}/results")
+def get_batch_results(request: Request, run_id: str):
+    store = request.app.state.store
+    run = store.get_run(run_id)
+    if not run:
+        from ...errors import DomainError
+
+        raise DomainError("E_NO_RUN", "批次不存在", 404)
+    return {
+        "run_id": run_id,
+        "active": store.active_result(run_id),
+        "results": store.results(run_id),
+    }

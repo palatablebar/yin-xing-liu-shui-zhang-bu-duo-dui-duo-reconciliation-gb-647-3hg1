@@ -8,7 +8,7 @@
   <span class="total"><b>匹配</b><em>{{ c.get('matched_groups', 0) }}</em>组</span>
   <span class="total"><b>未匹配</b><em>{{ c.get('bank_unmatched_rows', 0) + c.get('ledger_unmatched_rows', 0) }}</em>笔</span>
   <span class="total"><b>隔离</b><em>{{ c.get('bank_quarantine', 0) + c.get('ledger_quarantine', 0) }}</em>条</span>
-  <span class="total total-right"><b>差额</b><em>{% if reconciliation %}{{ reconciliation.totals.match_gap|money }}{% else %}0.00{% endif %}</em>元</span>
+  <span class="total total-right"><b>人民币差额</b><em>{% if reconciliation %}{{ reconciliation.totals.match_gap|money }}{% else %}0.00{% endif %}</em>元</span>
 </section>
 <main class="workbench">
   <section class="side side-bank">
@@ -31,14 +31,15 @@
       <button class="btn" type="submit">导入文件</button>
     </form>
     <div class="rules">
-      <span class="chip">容差 {{ contract.tolerance }} 元</span>
+      <span class="chip">容差 {{ contract.tolerance }} 元（原币）</span>
       <span class="chip">窗口 {{ contract.window_days }} 天</span>
       <span class="chip">子集 {{ contract.subset_max }} 笔</span>
+      <span class="chip">本位币 {{ contract.base_currency }}</span>
       <a class="chip chip-link" href="/api/contract">列定义</a>
     </div>
     <div class="table-wrap">
       <table class="grid" id="bank-table">
-        <thead><tr><th>流水号</th><th>账户</th><th>时间</th><th>方向</th><th class="num">金额</th><th class="num">手续费</th><th>状态</th></tr></thead>
+        <thead><tr><th>流水号</th><th>账户</th><th>时间</th><th>方向</th><th class="num">金额(原币)</th><th>币种</th><th class="num">手续费</th><th>状态</th></tr></thead>
         <tbody>
         {% for row in bank_rows %}
           <tr data-pair="{{ pairs.get(row.txn_no, '') }}" class="{% if row.txn_no not in pairs %}unmatched{% endif %}">
@@ -47,6 +48,7 @@
             <td class="mono">{{ row.posted_at|localdt }}</td>
             <td>{{ '收' if row.direction > 0 else '付' }}</td>
             <td class="num mono">{{ '+' if row.direction > 0 else '−' }}{{ row.amount|money }}</td>
+            <td class="mono">{{ row.currency }}</td>
             <td class="num mono">{{ row.fee|money }}</td>
             <td class="state">{% if row.txn_no in pairs %}已匹配{% else %}未匹配{% endif %}</td>
           </tr>

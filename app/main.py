@@ -32,6 +32,7 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=str(web.STATIC_DIR)), name="static")
     for module in MODULES:
         app.include_router(module.router)
+    app.include_router(m5_handler.rates_router)
     errors.install_handlers(app)
 
     @app.get("/api/health")
@@ -46,8 +47,14 @@ def create_app(settings: config.Settings | None = None) -> FastAPI:
         }
 
     @app.post("/api/demo/run")
-    def demo(request: Request) -> dict:
-        return pipeline.run_demo(request.app.state.settings, request.app.state.store)
+    def demo(request: Request, bank: str = "", ledger: str = "") -> dict:
+        settings = request.app.state.settings
+        return pipeline.run_demo(
+            settings,
+            request.app.state.store,
+            bank or pipeline.DEFAULT_BANK,
+            ledger or pipeline.DEFAULT_LEDGER,
+        )
 
     def _head_ok() -> Response:
         return Response(status_code=200, media_type="text/html; charset=utf-8")

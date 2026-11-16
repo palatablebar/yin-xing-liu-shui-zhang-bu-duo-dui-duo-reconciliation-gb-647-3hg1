@@ -12,8 +12,9 @@ from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from zoneinfo import ZoneInfo
 
+from .currency import strip_currency
+
 QUANT = Decimal("0.01")
-CURRENCY_RE = re.compile(r"(人民币|rmb|cny|元|￥|¥|\s)")
 DATE_ONLY_RE = re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$")
 
 
@@ -35,7 +36,7 @@ def parse_amount(raw, sentinels) -> Decimal | None:
     negative = text.startswith("(") and text.endswith(")")
     if negative:
         text = text[1:-1]
-    text = CURRENCY_RE.sub("", text).replace(",", "")
+    text = strip_currency(text)
     if text.startswith("+"):
         text = text[1:]
     if not text:
